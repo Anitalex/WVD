@@ -1,0 +1,201 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "domainConfigurationType": {
+            "defaultValue": "FullySynced",
+            "type": "String"
+        },
+        "domainName": {
+            "type": "String"
+        },
+        "filteredSync": {
+            "defaultValue": "Disabled",
+            "type": "String"
+        },
+        "location": {
+            "type": "String"
+        },
+        "notificationSettings": {
+            "defaultValue": {
+                "notifyGlobalAdmins": "Enabled",
+                "notifyDcAdmins": "Enabled",
+                "additionalRecipients": []
+            },
+            "type": "object"
+        },
+        "vnetName": {
+            "defaultValue": "vnet",
+            "type": "String"
+        },
+        "vnetAddressPrefixes": {
+            "defaultValue": [
+                "10.1.0.0/16"
+            ],
+            "type": "Array"
+        },
+        "subnetName-aadds": {
+            "defaultValue": "aadds-subnet",
+            "type": "String"
+        },
+        "subnetAddressPrefix-aadds": {
+            "defaultValue": "10.1.1.0/24",
+            "type": "String"
+        },
+        "nsgName-aadds": {
+            "defaultValue": "aadds-nsg",
+            "type": "String"
+        },
+        "subnetName-aadds-mgmt": {
+            "defaultValue": "aadds-mgmt-subnet",
+            "type": "String"
+        },
+        "subnetAddressPrefix-aadds-mgmt": {
+            "defaultValue": "10.1.254.0/24",
+            "type": "String"
+        },
+        "nsgName-aadds-mgmt": {
+            "defaultValue": "aadds-mgmt-nsg",
+            "type": "String"
+        },
+        "subnetName-wvd": {
+            "defaultValue": "wvd-subnet",
+            "type": "String"
+        },
+        "subnetAddressPrefix-wvd": {
+            "defaultValue": "10.1.2.0/24",
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "apiVersion": "2017-06-01",
+            "type": "Microsoft.AAD/DomainServices",
+            "name": "[parameters('domainName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/virtualNetworks/', parameters('vnetName'))]"
+            ],
+            "properties": {
+                "domainName": "[parameters('domainName')]",
+                "subnetId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/virtualNetworks/', parameters('vnetName'), '/subnets/', parameters('subnetName-aadds'))]",
+                "filteredSync": "[parameters('filteredSync')]",
+                "domainConfigurationType": "[parameters('domainConfigurationType')]",
+                "notificationSettings": "[parameters('notificationSettings')]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/NetworkSecurityGroups",
+            "name": "[parameters('nsgName-aadds')]",
+            "apiVersion": "2019-04-01",
+            "location": "[parameters('location')]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "AllowSyncWithAzureAD",
+                        "properties": {
+                            "access": "Allow",
+                            "priority": 101,
+                            "direction": "Inbound",
+                            "protocol": "Tcp",
+                            "sourceAddressPrefix": "AzureActiveDirectoryDomainServices",
+                            "sourcePortRange": "*",
+                            "destinationAddressPrefix": "*",
+                            "destinationPortRange": "443"
+                        }
+                    },
+                    {
+                        "name": "AllowPSRemoting",
+                        "properties": {
+                            "access": "Allow",
+                            "priority": 301,
+                            "direction": "Inbound",
+                            "protocol": "Tcp",
+                            "sourceAddressPrefix": "AzureActiveDirectoryDomainServices",
+                            "sourcePortRange": "*",
+                            "destinationAddressPrefix": "*",
+                            "destinationPortRange": "5986"
+                        }
+                    },
+                    {
+                        "name": "AllowRD",
+                        "properties": {
+                            "access": "Allow",
+                            "priority": 201,
+                            "direction": "Inbound",
+                            "protocol": "Tcp",
+                            "sourceAddressPrefix": "CorpNetSaw",
+                            "sourcePortRange": "*",
+                            "destinationAddressPrefix": "*",
+                            "destinationPortRange": "3389"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/NetworkSecurityGroups",
+            "name": "[parameters('nsgName-aadds-mgmt')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "RDP",
+                        "properties": {
+                            "access": "Allow",
+                            "priority": 101,
+                            "direction": "Inbound",
+                            "protocol": "Tcp",
+                            "sourceAddressPrefix": "*",
+                            "sourcePortRange": "*",
+                            "destinationAddressPrefix": "*",
+                            "destinationPortRange": "3389"
+                        }
+                    }
+                ]
+            },
+            "apiVersion": "2018-04-01"
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "name": "[parameters('vnetName')]",
+            "location": "[parameters('location')]",
+            "apiVersion": "2018-04-01",
+            "dependsOn": [
+                "[concat('Microsoft.Network/NetworkSecurityGroups/', parameters('nsgName-aadds'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": "[parameters('vnetAddressPrefixes')]"
+                },
+                "subnets": [
+                    {
+                        "name": "[parameters('subnetName-aadds')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnetAddressPrefix-aadds')]",
+                            "networkSecurityGroup": {
+                                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/NetworkSecurityGroups/', parameters('nsgName-aadds'))]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "[parameters('subnetName-aadds-mgmt')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnetAddressPrefix-aadds-mgmt')]",
+                            "networkSecurityGroup": {
+                                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/NetworkSecurityGroups/', parameters('nsgName-aadds-mgmt'))]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "[parameters('subnetName-wvd')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnetAddressPrefix-wvd')]"
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {}
+}

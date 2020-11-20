@@ -1,0 +1,22 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "functions": [],
+    "variables": {},
+    "resources": [
+        {
+            "comments": "Automation account for DSC",
+            "apiVersion": "2015-10-31",
+            "location": "[resourceGroup().location]",
+            "name": "automation",
+            "type": "Microsoft.Automation/automationAccounts",
+            "properties": {
+                "sku": {
+                    "name": "Basic"
+                }
+            }
+        }
+    ],
+    "outputs": {}
+}
